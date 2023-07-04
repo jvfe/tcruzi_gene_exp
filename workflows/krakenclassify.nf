@@ -11,7 +11,7 @@ WorkflowKrakenclassify.initialise(params, log)
 
 // TODO nf-core: Add all file path parameters for the pipeline to the list below
 // Check input path parameters to see if they exist
-def checkPathParamList = [ params.input, params.multiqc_config, params.kraken2_db ]
+def checkPathParamList = [ params.input, params.multiqc_config, params.kraken2_db, params.fasta, params.gtf ]
 for (param in checkPathParamList) { if (param) { file(param, checkIfExists: true) } }
 
 // Check mandatory parameters
@@ -55,6 +55,8 @@ include { KRAKEN2_KRAKEN2 as KRAKEN2  } from '../modules/nf-core/kraken2/kraken2
 include { BRACKEN_BRACKEN as BRACKEN  } from '../modules/nf-core/bracken/bracken/main'
 include { KRAKENTOOLS_KREPORT2KRONA as KREPORT2KRONA   } from '../modules/nf-core/krakentools/kreport2krona/main'
 include { KRONA_KTIMPORTTEXT as KTIMPORTTEXT           } from '../modules/nf-core/krona/ktimporttext/main'
+include { STAR_ALIGN                  } from '../modules/nf-core/star/align/main'
+include { STAR_GENOMEGENERATE         } from '../modules/nf-core/star/genomegenerate/main'
 include { CUSTOM_DUMPSOFTWAREVERSIONS } from '../modules/nf-core/custom/dumpsoftwareversions/main'
 
 /*
@@ -122,6 +124,14 @@ workflow KRAKENCLASSIFY {
     )
     ch_versions = ch_versions.mix(KTIMPORTTEXT.out.versions.first())
 
+    STAR_GENOMEGENERATE(
+        params.fasta, params.gtf
+    )
+
+    STAR_ALIGN(
+        KRAKEN2.out.classified_reads_fastq, STAR_GENOMEGENERATE.out.index, params.gtf, false, '', ''
+    )
+    ch_versions = ch_versions.mix(STAR_ALIGN.out.versions.first())
 
     CUSTOM_DUMPSOFTWAREVERSIONS (
         ch_versions.unique().collectFile(name: 'collated_versions.yml')
@@ -140,6 +150,7 @@ workflow KRAKENCLASSIFY {
     ch_multiqc_files = ch_multiqc_files.mix(ch_methods_description.collectFile(name: 'methods_description_mqc.yaml'))
     ch_multiqc_files = ch_multiqc_files.mix(CUSTOM_DUMPSOFTWAREVERSIONS.out.mqc_yml.collect())
     ch_multiqc_files = ch_multiqc_files.mix(FASTQC.out.zip.collect{it[1]}.ifEmpty([]))
+    ch_multiqc_files = ch_multiqc_files.mix(STAR_ALIGN.out.log_final.collect{it[1]}.ifEmpty([]))
 
     MULTIQC (
         ch_multiqc_files.collect(),
