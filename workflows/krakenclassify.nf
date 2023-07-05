@@ -106,6 +106,20 @@ workflow KRAKENCLASSIFY {
         .map { meta, path -> path }
         .set { krakendb }
 
+    if (params.fasta.endsWith('.gz')) {
+        ch_fasta    = GUNZIP_FASTA ( [ [:], params.fasta ] ).gunzip.map { it[1] }
+        ch_versions = ch_versions.mix(GUNZIP_FASTA.out.versions)
+    } else {
+        ch_fasta = Channel.of(file(params.fasta))
+    }
+
+    if (params.gtf.endsWith('.gz')) {
+            ch_gtf      = GUNZIP_GTF ( [ [:], params.gtf ] ).gunzip.map { it[1] }
+            ch_versions = ch_versions.mix(GUNZIP_GTF.out.versions)
+    } else {
+        ch_gtf = Channel.of(file(params.gtf))
+    }
+
     KRAKEN2 (
         INPUT_CHECK.out.reads,
         krakendb,
@@ -131,9 +145,7 @@ workflow KRAKENCLASSIFY {
     )
     ch_versions = ch_versions.mix(KTIMPORTTEXT.out.versions.first())
 
-    HISAT2_BUILD( ['genome', params.fasta],
-                    ['genome', params.gtf ]
-    )
+    HISAT2_BUILD( ch_fasta.map { tuple([:], it ) }, ch_gtf.map { tuple([:], it ) } )
 
     HISAT2_ALIGN(
         KRAKEN2.out.classified_reads_fastq,
@@ -142,16 +154,16 @@ workflow KRAKENCLASSIFY {
     ch_versions = ch_versions.mix(HISAT2_ALIGN.out.versions.first())
 
     STAR_GENOMEGENERATE(
-        params.fasta, params.gtf
+        ch_fasta, ch_gtf
     )
 
     STAR_ALIGN(
-        KRAKEN2.out.classified_reads_fastq, STAR_GENOMEGENERATE.out.index, params.gtf, false, '', ''
+        KRAKEN2.out.classified_reads_fastq, STAR_GENOMEGENERATE.out.index, ch_gtf, false, '', ''
     )
     ch_versions = ch_versions.mix(STAR_ALIGN.out.versions.first())
 
-    SUBREAD_FEATURECOUNTS (
-        HISAT2_ALIGN.out.bam.map{ [ it[0], it[1], params.gtf ] }, 'gene_id'
+    SUBREAD_FEATURECOUNTS(
+        HISAT2_ALIGN.out.bam.map{ meta, path -> tuple( meta, path,  file(params.gtf)  ) }, 'gene_id'
     )
     ch_versions = ch_versions.mix(SUBREAD_FEATURECOUNTS.out.versions)
 
