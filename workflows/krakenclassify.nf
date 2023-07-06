@@ -50,7 +50,7 @@ include { INPUT_CHECK } from '../subworkflows/local/input_check'
 //
 include { FASTQC                      } from '../modules/nf-core/fastqc/main'
 include { MULTIQC                     } from '../modules/nf-core/multiqc/main'
-include { UNTAR                       } from '../modules/nf-core/untar/main'
+//include { UNTAR                       } from '../modules/nf-core/untar/main'
 include { GUNZIP as GUNZIP_FASTA      } from '../modules/nf-core/gunzip/main'
 include { GUNZIP as GUNZIP_GTF        } from '../modules/nf-core/gunzip/main'
 include { KRAKEN2_KRAKEN2 as KRAKEN2  } from '../modules/nf-core/kraken2/kraken2/main'
@@ -98,13 +98,13 @@ workflow KRAKENCLASSIFY {
     )
     ch_versions = ch_versions.mix(FASTQC.out.versions.first())
 
-    UNTAR (
-        kraken_targz
-    )
+    // UNTAR (
+    //     kraken_targz
+    // )
 
-    UNTAR.out.untar
-        .map { meta, path -> path }
-        .set { krakendb }
+    // UNTAR.out.untar
+    //     .map { meta, path -> path }
+    //     .set { krakendb }
 
     if (params.fasta.endsWith('.gz')) {
         ch_fasta    = GUNZIP_FASTA ( [ [:], params.fasta ] ).gunzip.map { it[1] }
