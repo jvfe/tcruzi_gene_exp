@@ -80,7 +80,7 @@ workflow KRAKENCLASSIFY {
     ch_versions = Channel.empty()
     ch_multiqc_files = Channel.empty()
 
-    kraken_targz = Channel.of([[id: 'krakendb'], file(params.kraken2_db)])
+    //kraken_targz = Channel.of([[id: 'krakendb'], file(params.kraken2_db)])
 
     //
     // SUBWORKFLOW: Read in samplesheet, validate and stage input files
@@ -122,7 +122,7 @@ workflow KRAKENCLASSIFY {
 
     KRAKEN2 (
         INPUT_CHECK.out.reads,
-        krakendb,
+        params.kraken2_db,
         true,
         true
     )
