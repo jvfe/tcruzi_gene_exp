@@ -131,7 +131,7 @@ workflow KRAKENCLASSIFY {
 
     BRACKEN (
         KRAKEN2.out.report,
-        krakendb
+        params.kraken2_db
     )
     ch_versions = ch_versions.mix(BRACKEN.out.versions.first())
 
