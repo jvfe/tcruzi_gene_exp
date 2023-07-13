@@ -147,7 +147,7 @@ workflow KRAKENCLASSIFY {
     )
     ch_versions = ch_versions.mix(KTIMPORTTEXT.out.versions.first())
 
-    HISAT2_BUILD( ch_fasta.map { tuple([:], it ) }, ch_gtf.map { tuple([:], it ) } )
+    HISAT2_BUILD( tuple([:], ch_fasta), tuple([:], ch_gtf ) )
 
     HISAT2_ALIGN(
         KRAKEN2.out.classified_reads_fastq.map{ meta, classified_reads_fastq -> tuple( meta, classified_reads_fastq ) },
