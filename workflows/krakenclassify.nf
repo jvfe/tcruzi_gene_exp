@@ -11,7 +11,7 @@ WorkflowKrakenclassify.initialise(params, log)
 
 // TODO nf-core: Add all file path parameters for the pipeline to the list below
 // Check input path parameters to see if they exist
-def checkPathParamList = [ params.input, params.multiqc_config, params.kraken2_db ]
+def checkPathParamList = [ params.input, params.multiqc_config, params.kraken2_db, params.fasta, params.gtf ]
 for (param in checkPathParamList) { if (param) { file(param, checkIfExists: true) } }
 
 // Check mandatory parameters
@@ -51,10 +51,19 @@ include { INPUT_CHECK } from '../subworkflows/local/input_check'
 include { FASTQC                      } from '../modules/nf-core/fastqc/main'
 include { MULTIQC                     } from '../modules/nf-core/multiqc/main'
 include { UNTAR                       } from '../modules/nf-core/untar/main'
+include { GUNZIP as GUNZIP_FASTA      } from '../modules/nf-core/gunzip/main'
+include { GUNZIP as GUNZIP_GTF        } from '../modules/nf-core/gunzip/main'
 include { KRAKEN2_KRAKEN2 as KRAKEN2  } from '../modules/nf-core/kraken2/kraken2/main'
 include { BRACKEN_BRACKEN as BRACKEN  } from '../modules/nf-core/bracken/bracken/main'
 include { KRAKENTOOLS_KREPORT2KRONA as KREPORT2KRONA   } from '../modules/nf-core/krakentools/kreport2krona/main'
 include { KRONA_KTIMPORTTEXT as KTIMPORTTEXT           } from '../modules/nf-core/krona/ktimporttext/main'
+include { HISAT2_ALIGN                } from '../modules/nf-core/hisat2/align/main'
+include { HISAT2_BUILD                } from '../modules/nf-core/hisat2/build/main'
+include { STAR_ALIGN                  } from '../modules/nf-core/star/align/main'
+include { STAR_GENOMEGENERATE         } from '../modules/nf-core/star/genomegenerate/main'
+include { SUBREAD_FEATURECOUNTS       } from '../modules/nf-core/subread/featurecounts/main'
+include { GATHER_COUNTS_HISAT2        } from '../modules/local/gather_counts_hisat2'
+include { GATHER_COUNTS_STAR          } from '../modules/local/gather_counts_star'
 include { CUSTOM_DUMPSOFTWAREVERSIONS } from '../modules/nf-core/custom/dumpsoftwareversions/main'
 
 /*
@@ -81,11 +90,12 @@ workflow KRAKENCLASSIFY {
     )
     ch_versions = ch_versions.mix(INPUT_CHECK.out.versions)
 
-    //
-    // MODULE: Run FastQC
-    //
+    ch_reads = INPUT_CHECK.out.reads
+
+    ch_reads.dump(tag: "raw_reads")
+
     FASTQC (
-        INPUT_CHECK.out.reads
+        ch_reads
     )
     ch_versions = ch_versions.mix(FASTQC.out.versions.first())
 
@@ -95,10 +105,25 @@ workflow KRAKENCLASSIFY {
 
     UNTAR.out.untar
         .map { meta, path -> path }
+        .first()
         .set { krakendb }
 
+    if (params.fasta.endsWith('.gz')) {
+        ch_fasta    = GUNZIP_FASTA ( [ [:], params.fasta ] ).gunzip.map { it[1] }
+        ch_versions = ch_versions.mix(GUNZIP_FASTA.out.versions)
+    } else {
+        ch_fasta = file(params.fasta)
+    }
+
+    if (params.gtf.endsWith('.gz')) {
+            ch_gtf      = GUNZIP_GTF ( [ [:], params.gtf ] ).gunzip.map { it[1] }
+            ch_versions = ch_versions.mix(GUNZIP_GTF.out.versions)
+    } else {
+        ch_gtf = file(params.gtf)
+    }
+
     KRAKEN2 (
-        INPUT_CHECK.out.reads,
+        ch_reads,
         krakendb,
         true,
         true
@@ -122,6 +147,37 @@ workflow KRAKENCLASSIFY {
     )
     ch_versions = ch_versions.mix(KTIMPORTTEXT.out.versions.first())
 
+    HISAT2_BUILD( tuple([:], ch_fasta), tuple([:], ch_gtf ) )
+
+    HISAT2_ALIGN(
+        KRAKEN2.out.classified_reads_fastq.map{ meta, classified_reads_fastq -> tuple( meta, classified_reads_fastq ) },
+        HISAT2_BUILD.out.index,
+    )
+
+    ch_versions = ch_versions.mix(HISAT2_ALIGN.out.versions.first())
+
+    STAR_GENOMEGENERATE(
+        ch_fasta, ch_gtf
+    )
+
+    STAR_ALIGN(
+        KRAKEN2.out.classified_reads_fastq.map{ meta, classified_reads_fastq -> tuple( meta, classified_reads_fastq ) },
+        STAR_GENOMEGENERATE.out.index, ch_gtf, false, '', ''
+    )
+    ch_versions = ch_versions.mix(STAR_ALIGN.out.versions.first())
+
+    SUBREAD_FEATURECOUNTS(
+        HISAT2_ALIGN.out.bam.map{ meta, path -> tuple( meta, path,  file(params.gtf)  ) }, 'gene_id'
+    )
+    ch_versions = ch_versions.mix(SUBREAD_FEATURECOUNTS.out.versions)
+
+    GATHER_COUNTS_HISAT2(
+        SUBREAD_FEATURECOUNTS.out.counts.collect{it[1]}
+    )
+
+    GATHER_COUNTS_STAR(
+        STAR_ALIGN.out.read_per_gene_tab.collect{it[1]}
+    )
 
     CUSTOM_DUMPSOFTWAREVERSIONS (
         ch_versions.unique().collectFile(name: 'collated_versions.yml')
@@ -140,6 +196,9 @@ workflow KRAKENCLASSIFY {
     ch_multiqc_files = ch_multiqc_files.mix(ch_methods_description.collectFile(name: 'methods_description_mqc.yaml'))
     ch_multiqc_files = ch_multiqc_files.mix(CUSTOM_DUMPSOFTWAREVERSIONS.out.mqc_yml.collect())
     ch_multiqc_files = ch_multiqc_files.mix(FASTQC.out.zip.collect{it[1]}.ifEmpty([]))
+    ch_multiqc_files = ch_multiqc_files.mix(STAR_ALIGN.out.log_final.collect{it[1]}.ifEmpty([]))
+    ch_multiqc_files = ch_multiqc_files.mix(HISAT2_ALIGN.out.summary.collect{it[1]}.ifEmpty([]))
+    ch_multiqc_files = ch_multiqc_files.mix(SUBREAD_FEATURECOUNTS.out.summary.collect{it[1]}.ifEmpty([]))
 
     MULTIQC (
         ch_multiqc_files.collect(),

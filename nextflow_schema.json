@@ -5,6 +5,25 @@
     "description": "Run kraken2 taxonomic classification",
     "type": "object",
     "definitions": {
+        "alignment": {
+            "title": "Alignment",
+            "type": "object",
+            "description": "Reference files for alignment",
+            "default": "",
+            "properties": {
+                "gtf": {
+                    "type": "string",
+                    "description": "Reference GTF file for alignment",
+                    "format": "file-path"
+                },
+                "fasta": {
+                    "type": "string",
+                    "description": "Reference fasta file for alignment",
+                    "format": "file-path"
+                }
+            },
+            "required": ["gtf", "fasta"]
+        },
         "input_output_options": {
             "title": "Input/output options",
             "type": "object",
@@ -220,6 +239,9 @@
         }
     },
     "allOf": [
+        {
+            "$ref": "#/definitions/alignment"
+        },
         {
             "$ref": "#/definitions/input_output_options"
         },
