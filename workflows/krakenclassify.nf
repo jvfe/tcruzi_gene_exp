@@ -112,14 +112,14 @@ workflow KRAKENCLASSIFY {
         ch_fasta    = GUNZIP_FASTA ( [ [:], params.fasta ] ).gunzip.map { it[1] }
         ch_versions = ch_versions.mix(GUNZIP_FASTA.out.versions)
     } else {
-        ch_fasta = Channel.of(file(params.fasta))
+        ch_fasta = file(params.fasta)
     }
 
     if (params.gtf.endsWith('.gz')) {
             ch_gtf      = GUNZIP_GTF ( [ [:], params.gtf ] ).gunzip.map { it[1] }
             ch_versions = ch_versions.mix(GUNZIP_GTF.out.versions)
     } else {
-        ch_gtf = Channel.of(file(params.gtf))
+        ch_gtf = file(params.gtf)
     }
 
     KRAKEN2 (
