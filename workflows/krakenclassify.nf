@@ -122,8 +122,6 @@ workflow KRAKENCLASSIFY {
         ch_gtf = Channel.of(file(params.gtf))
     }
 
-    ch_reads.dump(tag: "raw_reads")
-
     KRAKEN2 (
         ch_reads,
         krakendb,
@@ -152,19 +150,19 @@ workflow KRAKENCLASSIFY {
     HISAT2_BUILD( ch_fasta.map { tuple([:], it ) }, ch_gtf.map { tuple([:], it ) } )
 
     HISAT2_ALIGN(
-        KRAKEN2.out.classified_reads_fastq,
+        KRAKEN2.out.classified_reads_fastq.map{ meta, classified_reads_fastq -> tuple( meta, classified_reads_fastq ) },
         HISAT2_BUILD.out.index,
     )
+
     ch_versions = ch_versions.mix(HISAT2_ALIGN.out.versions.first())
 
     STAR_GENOMEGENERATE(
         ch_fasta, ch_gtf
     )
 
-    KRAKEN2.out.classified_reads_fastq.collect().dump(tag: "kraken_reads")
-
     STAR_ALIGN(
-        KRAKEN2.out.classified_reads_fastq, STAR_GENOMEGENERATE.out.index, ch_gtf, false, '', ''
+        KRAKEN2.out.classified_reads_fastq.map{ meta, classified_reads_fastq -> tuple( meta, classified_reads_fastq ) },
+        STAR_GENOMEGENERATE.out.index, ch_gtf, false, '', ''
     )
     ch_versions = ch_versions.mix(STAR_ALIGN.out.versions.first())
 
