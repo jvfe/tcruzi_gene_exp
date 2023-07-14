@@ -111,7 +111,6 @@ workflow KRAKENCLASSIFY {
     if (params.fasta.endsWith('.gz')) {
         ch_fasta    = GUNZIP_FASTA ( [ [:], params.fasta ] ).gunzip.first()
         ch_fasta_star = ch_fasta.map{it[1]}
-        ch_versions = ch_versions.mix(GUNZIP_FASTA.out.versions)
     } else {
         ch_fasta = tuple([:], file(params.fasta))
         ch_fasta_star = ch_fasta[1]
