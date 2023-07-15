@@ -97,6 +97,11 @@ workflow KRAKENCLASSIFY {
     )
     ch_versions = ch_versions.mix(FASTQC.out.versions.first())
 
+    FASTP(
+        ch_reads
+    )
+    ch_versions = ch_versions.mix(FASTP.out.versions.first())
+
     UNTAR (
         kraken_targz
     )
@@ -124,19 +129,14 @@ workflow KRAKENCLASSIFY {
     }
 
     KRAKEN2 (
-        ch_reads,
+        FASTP.out.reads,
         krakendb,
         true,
         true
     )
     ch_versions = ch_versions.mix(KRAKEN2.out.versions.first())
-    ch_multiqc_files = ch_multiqc_files.mix(KRAKEN2.out.report.collect{it[1]}.ifEmpty([]))
 
     classified_reads = KRAKEN2.out.classified_reads_fastq.map{ meta, classified_reads_fastq -> tuple( meta, classified_reads_fastq ) }
-
-    FASTP(
-        classified_reads
-    )
 
     HISAT2_BUILD( ch_fasta, ch_gtf )
 
@@ -188,6 +188,7 @@ workflow KRAKENCLASSIFY {
     ch_multiqc_files = ch_multiqc_files.mix(CUSTOM_DUMPSOFTWAREVERSIONS.out.mqc_yml.collect())
     ch_multiqc_files = ch_multiqc_files.mix(FASTQC.out.zip.collect{it[1]}.ifEmpty([]))
     ch_multiqc_files = ch_multiqc_files.mix(FASTP.out.log.collect{it[1]}.ifEmpty([]))
+    ch_multiqc_files = ch_multiqc_files.mix(KRAKEN2.out.report.collect{it[1]}.ifEmpty([]))
     ch_multiqc_files = ch_multiqc_files.mix(STAR_ALIGN.out.log_final.collect{it[1]}.ifEmpty([]))
     ch_multiqc_files = ch_multiqc_files.mix(HISAT2_ALIGN.out.summary.collect{it[1]}.ifEmpty([]))
     ch_multiqc_files = ch_multiqc_files.mix(SUBREAD_FEATURECOUNTS.out.summary.collect{it[1]}.ifEmpty([]))
