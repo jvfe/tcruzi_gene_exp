@@ -7,8 +7,8 @@
 **jvfe/tcruzi_gene_exp** is a bioinformatics pipeline to preprocess and extract T. cruzi gene expression data
 
 1. Read QC ([`FastQC`](https://www.bioinformatics.babraham.ac.uk/projects/fastqc/))
-2. fastp for read pre-processing ([`fastp`](https://github.com/OpenGene/fastp)
-3. Kraken2 for extracting only protozoa reads ([`kraken2`](https://github.com/DerrickWood/kraken2)
+2. fastp for read pre-processing ([`fastp`](https://github.com/OpenGene/fastp))
+3. Kraken2 for extracting only protozoa reads ([`kraken2`](https://github.com/DerrickWood/kraken2))
 4. [HiSat2](http://daehwankimlab.github.io/hisat2/) and [STAR](https://hbctraining.github.io/Intro-to-rnaseq-hpc-O2/lessons/03_alignment.html) for sequence alignment
 5. [SubRead](https://subread.sourceforge.net/) for read quantification
 
